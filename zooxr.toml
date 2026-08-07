@@ -1,0 +1,31 @@
+schema_version = 1
+
+[network]
+region = "San Francisco, California, USA"
+network_type = "drive"
+graph_path = ".zooxr/san-francisco.graphml"
+
+[candidates]
+distance_paths = 8
+travel_time_paths = 12
+target_distance_paths = 12
+maximum_distance_error_ratio = 0.35
+maximum_distance_error_miles = 0.35
+
+[traffic]
+weekday_peak_multiplier = 1.45
+weekday_day_multiplier = 1.20
+weekend_day_multiplier = 1.10
+night_multiplier = 1.0
+arterial_congestion_factor = 1.20
+side_street_congestion_factor = 0.75
+signal_delay_seconds = 18.0
+left_turn_delay_seconds = 10.0
+
+[scoring]
+distance_weight = 4.0
+duration_weight = 2.0
+arterial_weight = 0.25
+side_street_reward = 0.15
+turn_weight = 0.05
+temperature = 0.35
