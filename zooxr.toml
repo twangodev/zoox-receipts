@@ -5,6 +5,12 @@ region = "San Francisco, California, USA"
 network_type = "drive"
 graph_path = ".zooxr/san-francisco.graphml"
 
+[service_area]
+# Approximate current rider geofence: east of Divisadero, north of Cesar Chavez.
+enabled = true
+west_longitude = -122.4430
+south_latitude = 37.7475
+
 [candidates]
 distance_paths = 8
 travel_time_paths = 12

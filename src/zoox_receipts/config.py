@@ -19,6 +19,13 @@ class NetworkConfig:
 
 
 @dataclass(frozen=True)
+class ServiceAreaConfig:
+    enabled: bool = True
+    west_longitude: float = -122.4430
+    south_latitude: float = 37.7475
+
+
+@dataclass(frozen=True)
 class CandidateConfig:
     distance_paths: int = 8
     travel_time_paths: int = 12
@@ -53,6 +60,7 @@ class ScoringConfig:
 class RoutingConfig:
     schema_version: int = 1
     network: NetworkConfig = NetworkConfig()
+    service_area: ServiceAreaConfig = ServiceAreaConfig()
     candidates: CandidateConfig = CandidateConfig()
     traffic: TrafficConfig = TrafficConfig()
     scoring: ScoringConfig = ScoringConfig()
@@ -71,6 +79,7 @@ def load_config(path: Path | None = None) -> RoutingConfig:
         config = RoutingConfig(
             schema_version=data.get("schema_version", 1),
             network=NetworkConfig(**data.get("network", {})),
+            service_area=ServiceAreaConfig(**data.get("service_area", {})),
             candidates=CandidateConfig(**data.get("candidates", {})),
             traffic=TrafficConfig(**data.get("traffic", {})),
             scoring=ScoringConfig(**data.get("scoring", {})),
@@ -89,4 +98,8 @@ def load_config(path: Path | None = None) -> RoutingConfig:
         raise ConfigError("candidate path counts must be positive")
     if config.scoring.temperature <= 0:
         raise ConfigError("scoring temperature must be positive")
+    if not -180 <= config.service_area.west_longitude <= 180:
+        raise ConfigError("service-area west longitude is invalid")
+    if not -90 <= config.service_area.south_latitude <= 90:
+        raise ConfigError("service-area south latitude is invalid")
     return config

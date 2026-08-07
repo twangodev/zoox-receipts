@@ -7,9 +7,10 @@ from pathlib import Path
 import networkx as nx
 import osmnx as ox
 
-from zoox_receipts.config import CandidateConfig, RoutingConfig
+from zoox_receipts.config import CandidateConfig, RoutingConfig, ServiceAreaConfig
 from zoox_receipts.routing import RouteEngine, load_graph
 from zoox_receipts.routing.aggregate import aggregate_routes
+from zoox_receipts.routing.geojson import route_feature_collection
 from zoox_receipts.routing.inference import infer_routes
 from zoox_receipts.routing.pipeline import candidate_sets
 from zoox_receipts.routing.traffic import apply_typical_traffic, period_multiplier
@@ -161,6 +162,50 @@ class RoutingTest(unittest.TestCase):
             0.01,
         )
 
+    def test_excludes_routes_outside_the_zoox_service_area(self) -> None:
+        graph = routing_graph()
+        graph.add_node(7, x=-122.4500, y=37.7700)
+        graph.add_edge(
+            1,
+            7,
+            key=0,
+            length=100.0,
+            travel_time=10.0,
+            highway="residential",
+            speed_kph=25.0,
+        )
+        graph.add_edge(
+            7,
+            4,
+            key=0,
+            length=100.0,
+            travel_time=10.0,
+            highway="residential",
+            speed_kph=25.0,
+        )
+        config = RoutingConfig(
+            service_area=ServiceAreaConfig(
+                west_longitude=-122.4430,
+                south_latitude=37.7475,
+            ),
+            candidates=CandidateConfig(
+                distance_paths=3,
+                travel_time_paths=3,
+                target_distance_paths=3,
+                maximum_distance_error_ratio=1.0,
+                maximum_distance_error_miles=1.0,
+            ),
+        )
+
+        candidates = RouteEngine(graph, config).candidates_for(RIDE)
+
+        self.assertTrue(candidates)
+        self.assertTrue(all(7 not in candidate.nodes for candidate in candidates))
+
+        outside = {**RIDE, "startCoordinate": [-122.4500, 37.7700]}
+        with self.assertRaisesRegex(ValueError, "pickup.*outside"):
+            RouteEngine(graph, config).candidates_for(outside)
+
     def test_loads_a_cached_graph_and_hashes_it(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "graph.graphml"
@@ -221,6 +266,28 @@ class RoutingTest(unittest.TestCase):
         self.assertEqual(inference["rides"][0]["route"]["type"], "LineString")
         self.assertGreater(len(aggregate["features"]), 0)
         self.assertEqual(aggregate["rideCount"], 1)
+
+        geojson = route_feature_collection([RIDE], inference)
+        self.assertEqual(geojson["type"], "FeatureCollection")
+        self.assertEqual(geojson["routeCount"], 1)
+        self.assertEqual(geojson["features"][0]["properties"]["rideId"], RIDE["id"])
+
+        canceled = {
+            **RIDE,
+            "id": "ride_canceled",
+            "canceled": True,
+            "startedAt": None,
+            "distanceMiles": 0.0,
+            "durationMinutes": 0,
+        }
+        with_canceled = route_feature_collection([RIDE, canceled], inference)
+        self.assertEqual(with_canceled["canceledRideCount"], 1)
+        self.assertEqual(with_canceled["routeCount"], 1)
+        self.assertIsNone(with_canceled["features"][1]["geometry"])
+        self.assertEqual(
+            with_canceled["features"][1]["properties"]["status"],
+            "canceled",
+        )
 
 
 if __name__ == "__main__":

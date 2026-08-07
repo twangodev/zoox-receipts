@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 import osmnx as ox
 
-from ..config import RoutingConfig
+from ..config import RoutingConfig, ServiceAreaConfig
 from .models import EdgeId, RouteCandidate
 from .traffic import ARTERIAL_TYPES, SIDE_STREET_TYPES, apply_typical_traffic, highway_types
 
@@ -18,6 +18,35 @@ METERS_PER_MILE = 1609.344
 
 class RoutingError(ValueError):
     pass
+
+
+def in_service_area(
+    longitude: float,
+    latitude: float,
+    config: ServiceAreaConfig,
+) -> bool:
+    return (
+        not config.enabled
+        or longitude >= config.west_longitude
+        and latitude >= config.south_latitude
+    )
+
+
+def service_area_graph(
+    graph: nx.MultiDiGraph,
+    config: ServiceAreaConfig,
+) -> nx.MultiDiGraph:
+    if not config.enabled:
+        return graph
+    nodes = [
+        node
+        for node, data in graph.nodes(data=True)
+        if in_service_area(float(data["x"]), float(data["y"]), config)
+    ]
+    constrained = graph.subgraph(nodes).copy()
+    if not constrained:
+        raise RoutingError("configured service area contains no routing nodes")
+    return constrained
 
 
 class NodeIndex:
@@ -167,9 +196,9 @@ def target_distance_candidates(
 
 class RouteEngine:
     def __init__(self, graph: nx.MultiDiGraph, config: RoutingConfig) -> None:
-        self.graph = graph
+        self.graph = service_area_graph(graph, config.service_area)
         self.config = config
-        self.node_index = NodeIndex(graph)
+        self.node_index = NodeIndex(self.graph)
 
     def candidates_for(self, ride: dict[str, object]) -> list[RouteCandidate]:
         if bool(ride.get("canceled")):
@@ -181,6 +210,10 @@ class RouteEngine:
             raise RoutingError("completed ride has no start timestamp")
         if not _coordinate(start) or not _coordinate(end):
             raise RoutingError("completed ride has unresolved endpoint coordinates")
+        if not in_service_area(float(start[0]), float(start[1]), self.config.service_area):
+            raise RoutingError("pickup is outside the configured Zoox service area")
+        if not in_service_area(float(end[0]), float(end[1]), self.config.service_area):
+            raise RoutingError("drop-off is outside the configured Zoox service area")
         apply_typical_traffic(self.graph, started_at, self.config.traffic)
         origin = self.node_index.nearest(float(start[0]), float(start[1]))
         destination = self.node_index.nearest(float(end[0]), float(end[1]))

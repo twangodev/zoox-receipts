@@ -167,6 +167,7 @@ takeout-*.zip
 /rides.json
 /rides.geocoded.json
 /routes.json
+/routes.geojson
 /route-usage.geojson
 *.geocoding-cache.json
 /.zooxr/
