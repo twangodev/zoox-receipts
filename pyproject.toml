@@ -1,0 +1,21 @@
+[project]
+name = "zoox-receipts"
+version = "0.1.0"
+description = "Export structured ride data from Zoox receipt emails"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "geopy>=2.4.1",
+    "httpx>=0.28.1",
+    "networkx>=3.6.1",
+    "numpy>=2.5.1",
+    "osmnx>=2.1.0",
+    "typer>=0.27.1",
+]
+
+[project.scripts]
+zooxr = "zoox_receipts.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
